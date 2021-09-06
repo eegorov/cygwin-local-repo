@@ -100,6 +100,8 @@ src_prepare() {
 
 	sed -i -e "s:@@GENTOO_LIBDIR@@:$(get_libdir):g" \
 		setup.py || die "sed failed to replace @@GENTOO_LIBDIR@@"
+	sed -i -e "s:@@EPREFIX@@:${EPREFIX}:g" \
+		setup.py || die "sed failed to replace @@EPREFIX@@"
 
 	# force correct number of jobs
 	# https://bugs.gentoo.org/737660
