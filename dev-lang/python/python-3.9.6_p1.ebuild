@@ -11,7 +11,7 @@ MY_PV=${PV/_rc/rc}
 MY_P="Python-${MY_PV%_p*}"
 PYVER=$(ver_cut 1-2)
 PATCHSET="python-gentoo-patches-${MY_PV}"
-PREFIX_PATCHSET="python-prefix-gentoo-3.9.1-patches-r2"
+PREFIX_PATCHSET="python-prefix-gentoo-${MY_PV}-patches-r0"
 
 DESCRIPTION="An interpreted, interactive, object-oriented programming language"
 HOMEPAGE="https://www.python.org/"
@@ -26,7 +26,7 @@ S="${WORKDIR}/${MY_P}"
 LICENSE="PSF-2"
 SLOT="${PYVER}"
 KEYWORDS="~x64-cygwin ~amd64-linux ~x86-linux ~ppc-macos ~x64-macos ~sparc-solaris ~sparc64-solaris ~x64-solaris ~x86-solaris"
-IUSE="aqua bluetooth build examples gdbm hardened ipv6 libressl +ncurses +readline +sqlite +ssl test tk wininst +xml"
+IUSE="aqua bluetooth build examples gdbm hardened ipv6 +ncurses +readline +sqlite +ssl test tk wininst +xml"
 RESTRICT="!test? ( test )"
 
 # Do not add a dependency on dev-lang/python to this ebuild.
@@ -45,10 +45,7 @@ RDEPEND="app-arch/bzip2:=
 	ncurses? ( >=sys-libs/ncurses-5.2:= )
 	readline? ( >=sys-libs/readline-4.1:= )
 	sqlite? ( >=dev-db/sqlite-3.3.8:3= )
-	ssl? (
-		!libressl? ( dev-libs/openssl:= )
-		libressl? ( dev-libs/libressl:= )
-	)
+	ssl? ( >=dev-libs/openssl-1.1.1:= )
 	tk? (
 		>=dev-lang/tcl-8.0:=
 		>=dev-lang/tk-8.0:=
@@ -66,9 +63,8 @@ BDEPEND="
 	verify-sig? ( app-crypt/openpgp-keys-python )
 	!sys-devel/gcc[libffi(-)]"
 RDEPEND+=" !build? ( app-misc/mime-types )"
-PDEPEND="app-eselect/eselect-python"
 
-VERIFY_SIG_OPENPGP_KEY_PATH=/usr/share/openpgp-keys/python.org.asc
+VERIFY_SIG_OPENPGP_KEY_PATH=${BROOT}/usr/share/openpgp-keys/python.org.asc
 
 # large file tests involve a 2.5G file being copied (duplicated)
 CHECKREQS_DISK_BUILD=5500M
@@ -104,9 +100,6 @@ src_prepare() {
 
 	sed -i -e "s:@@GENTOO_LIBDIR@@:$(get_libdir):g" \
 		setup.py || die "sed failed to replace @@GENTOO_LIBDIR@@"
-	sed -i -e "s:@@EPREFIX@@:${EPREFIX}:g" \
-		setup.py || die "sed failed to replace @@EPREFIX@@"
-
 
 	# force correct number of jobs
 	# https://bugs.gentoo.org/737660
@@ -128,6 +121,16 @@ src_prepare() {
 	if [[ ${CHOST} == powerpc*-darwin9 ]] ; then
 		sed -i \
 			-e 's/KQUEUE/KQUEUE_DISABLED/' \
+			configure.ac configure || die
+	fi
+
+	if [[ ${CHOST} == *-darwin19 ]] ; then
+		# HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH is set because
+		# _dyld_shared_cache_contains_path could be found, yet it cannot
+		# be resolved when dlopen()ing, so simply pretend it doesn't
+		# exist here
+		sed -i \
+			-e 's/_dyld_shared_cache_contains_path/disabled&/' \
 			configure.ac configure || die
 	fi
 
@@ -236,7 +239,7 @@ src_compile() {
 	emake CPPFLAGS= CFLAGS= LDFLAGS=
 
 	# Work around bug 329499. See also bug 413751 and 457194.
-	if has_version dev-libs/libffi[pax_kernel]; then
+	if has_version dev-libs/libffi[pax-kernel]; then
 		pax-mark E python
 	else
 		pax-mark m python
@@ -309,7 +312,7 @@ src_install() {
 	fi
 
 	# Remove static library
-	for x in $(ls "${ED}"/usr/$(get_libdir)/libpython*.a | grep -v dll.a) ; do 	rm "${x}" ; done || die
+	for x in $(ls "${ED}"/usr/$(get_libdir)/libpython*.a | grep -v dll.a) ; do      rm "${x}" ; done || die
 
 	sed \
 		-e "s/\(CONFIGURE_LDFLAGS=\).*/\1/" \
@@ -333,7 +336,7 @@ src_install() {
 
 	# python seems to get rebuilt in src_install (bug 569908)
 	# Work around it for now.
-	if has_version dev-libs/libffi[pax_kernel]; then
+	if has_version dev-libs/libffi[pax-kernel]; then
 		pax-mark E "${ED}/usr/bin/${abiver}"
 	else
 		pax-mark m "${ED}/usr/bin/${abiver}"
