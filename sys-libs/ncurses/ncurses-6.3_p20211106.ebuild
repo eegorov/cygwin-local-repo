@@ -14,8 +14,34 @@ SRC_URI="mirror://gnu/ncurses/${MY_P}.tar.gz
 	ftp://ftp.invisible-island.net/${PN}/${MY_P}.tar.gz"
 
 if [[ "${PV}" == *_p* ]] ; then
-	SRC_URI+=" ftp://ftp.invisible-island.net/${PN}/${PV/_p*}/${P/_p/-}-patch.sh.bz2
-		https://invisible-mirror.net/archives/${PN}/${PV/_p*}/${P/_p/-}-patch.sh.bz2"
+	# Sometimes, after releases, there's no megapatch available yet.
+	#
+	# From upstream README at e.g. https://invisible-mirror.net/archives/ncurses/6.3/:
+	#
+	#	"At times (generally to mark a relatively stable point), I create a rollup
+	#	patch, which consists of all changes from the release through the current date."
+	#
+	# This array should contain a list of all the snapshots since the last
+	# release if there's no megapatch available yet.
+	PATCH_DATES=(
+		20211026
+		20211030
+		# Latest patch is just _pN = $(ver_cut 4)
+		$(ver_cut 4)
+	)
+
+	if [[ -z ${PATCH_DATES[@]} ]] ; then
+		SRC_URI+=" ftp://ftp.invisible-island.net/${PN}/${PV/_p*}/${P/_p/-}.patch.sh.bz2
+			https://invisible-mirror.net/archives/${PN}/${PV/_p*}/${P/_p/-}.patch.sh.bz2"
+	else
+		patch_date=
+		for patch_date in "${PATCH_DATES[@]}" ; do
+			SRC_URI+=" ftp://ftp.invisible-island.net/${PN}/${PV/_p*}/${MY_P}-${patch_date}.patch.gz"
+			SRC_URI+=" https://invisible-mirror.net/archives/${PN}/${PV/_p*}/${MY_P}-${patch_date}.patch.gz"
+		done
+		unset patch_date
+	fi
+
 	#SRC_URI+=" https://dev.gentoo.org/~polynomial-c/dist/${P}.patch.xz"
 fi
 
@@ -47,8 +73,8 @@ PATCHES=(
 
 src_prepare() {
 	if [[ "${PV}" == *_p* ]] ; then
-		eapply "${WORKDIR}"/${P/_p/-}-patch.sh
-		#eapply "${WORKDIR}/${P}.patch"
+		#eapply "${WORKDIR}"/${P/_p/-}-patch.sh
+		eapply "${WORKDIR}"/
 	fi
 	default
 }
@@ -205,7 +231,7 @@ src_compile() {
 		if [[ ${CHOST} == *-cygwin* ]] && ! multilib_is_native_abi ; then
 			# We make 'tic$(x)' here, for Cygwin having x=".exe".
 			BUILD_DIR="${WORKDIR}" \
-				 do_compile cross -C progs all PROGS='tic.exe'
+				 do_compile cross -C progs all PROGS='tic$(x)'
 		else
 			BUILD_DIR="${WORKDIR}" \
 				 do_compile cross -C progs tic.exe
